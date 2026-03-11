@@ -197,39 +197,53 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
         }
         // > p:sp\p:nvSpPr
         $objWriter->endElement();
-        // p:sp\p:spPr
-        $objWriter->startElement('p:spPr');
 
-        // p:sp\p:spPr\a:xfrm
-        $objWriter->startElement('a:xfrm');
-        $objWriter->writeAttributeIf($shape->getRotation() != 0, 'rot', CommonDrawing::degreesToAngle($shape->getRotation()));
-        // p:sp\p:spPr\a:xfrm\a:off
-        $objWriter->startElement('a:off');
-        $objWriter->writeAttribute('x', CommonDrawing::pixelsToEmu($shape->getOffsetX()));
-        $objWriter->writeAttribute('y', CommonDrawing::pixelsToEmu($shape->getOffsetY()));
-        $objWriter->endElement();
-        // p:sp\p:spPr\a:xfrm\a:ext
-        $objWriter->startElement('a:ext');
-        $objWriter->writeAttribute('cx', CommonDrawing::pixelsToEmu($shape->getWidth()));
-        $objWriter->writeAttribute('cy', CommonDrawing::pixelsToEmu($shape->getHeight()));
-        $objWriter->endElement();
-        // > p:sp\p:spPr\a:xfrm
-        $objWriter->endElement();
-        // p:sp\p:spPr\a:prstGeom
-        $objWriter->startElement('a:prstGeom');
-        $objWriter->writeAttribute('prst', 'rect');
+        // Detect if this placeholder should inherit geometry from layout
+        // (position/size all zero means no explicit geometry was defined)
+        $isInheritedPlaceholder = $shape->isPlaceholder()
+            && 0 === $shape->getOffsetX()
+            && 0 === $shape->getOffsetY()
+            && 0 === $shape->getWidth()
+            && 0 === $shape->getHeight();
 
-        // p:sp\p:spPr\a:prstGeom\a:avLst
-        $objWriter->writeElement('a:avLst');
+        if ($isInheritedPlaceholder) {
+            // Write empty p:spPr to inherit position/size from layout
+            $objWriter->writeElement('p:spPr', null);
+        } else {
+            // p:sp\p:spPr
+            $objWriter->startElement('p:spPr');
 
-        $objWriter->endElement();
+            // p:sp\p:spPr\a:xfrm
+            $objWriter->startElement('a:xfrm');
+            $objWriter->writeAttributeIf($shape->getRotation() != 0, 'rot', CommonDrawing::degreesToAngle($shape->getRotation()));
+            // p:sp\p:spPr\a:xfrm\a:off
+            $objWriter->startElement('a:off');
+            $objWriter->writeAttribute('x', CommonDrawing::pixelsToEmu($shape->getOffsetX()));
+            $objWriter->writeAttribute('y', CommonDrawing::pixelsToEmu($shape->getOffsetY()));
+            $objWriter->endElement();
+            // p:sp\p:spPr\a:xfrm\a:ext
+            $objWriter->startElement('a:ext');
+            $objWriter->writeAttribute('cx', CommonDrawing::pixelsToEmu($shape->getWidth()));
+            $objWriter->writeAttribute('cy', CommonDrawing::pixelsToEmu($shape->getHeight()));
+            $objWriter->endElement();
+            // > p:sp\p:spPr\a:xfrm
+            $objWriter->endElement();
+            // p:sp\p:spPr\a:prstGeom
+            $objWriter->startElement('a:prstGeom');
+            $objWriter->writeAttribute('prst', 'rect');
 
-        $this->writeFill($objWriter, $shape->getFill());
-        $this->writeBorder($objWriter, $shape->getBorder(), '');
-        $this->writeShadow($objWriter, $shape->getShadow());
+            // p:sp\p:spPr\a:prstGeom\a:avLst
+            $objWriter->writeElement('a:avLst');
 
-        // > p:sp\p:spPr
-        $objWriter->endElement();
+            $objWriter->endElement();
+
+            $this->writeFill($objWriter, $shape->getFill());
+            $this->writeBorder($objWriter, $shape->getBorder(), '');
+            $this->writeShadow($objWriter, $shape->getShadow());
+
+            // > p:sp\p:spPr
+            $objWriter->endElement();
+        }
         // p:txBody
         $objWriter->startElement('p:txBody');
         // a:bodyPr
@@ -313,6 +327,9 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
             ));
             $objWriter->endElement();
             $objWriter->endElement();
+        } elseif ($isInheritedPlaceholder) {
+            // Write minimal paragraph to preserve layout text inheritance
+            $this->writePlaceholderParagraphs($objWriter, $shape->getParagraphs());
         } else {
             // Write paragraphs
             $this->writeParagraphs($objWriter, $shape->getParagraphs());
@@ -553,6 +570,44 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
                     $objWriter->endElement();
 
                     $objWriter->endElement();
+                }
+            }
+
+            $objWriter->endElement();
+        }
+    }
+
+    /**
+     * Write paragraphs for inherited placeholder shapes.
+     *
+     * When a placeholder on a slide has no explicit geometry (inheriting from
+     * layout), we write minimal paragraph markup so text formatting is also
+     * inherited from the layout/master rather than being overridden.
+     *
+     * @param array<Paragraph> $paragraphs
+     */
+    protected function writePlaceholderParagraphs(XMLWriter $objWriter, array $paragraphs): void
+    {
+        foreach ($paragraphs as $paragraph) {
+            $objWriter->startElement('a:p');
+
+            // Only write text runs that have actual content
+            $elements = $paragraph->getRichTextElements();
+            foreach ($elements as $element) {
+                if ($element instanceof BreakElement) {
+                    $objWriter->writeElement('a:br', null);
+                } elseif ($element instanceof Run || $element instanceof TextElement) {
+                    $text = $element->getText();
+                    if ('' !== $text) {
+                        $objWriter->startElement('a:r');
+                        if ($element instanceof Run) {
+                            $this->writeRunStyles($objWriter, $element);
+                        }
+                        $objWriter->startElement('a:t');
+                        $objWriter->writeCData(Text::controlCharacterPHP2OOXML($text));
+                        $objWriter->endElement();
+                        $objWriter->endElement();
+                    }
                 }
             }
 

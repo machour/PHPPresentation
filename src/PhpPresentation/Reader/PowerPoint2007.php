@@ -1073,6 +1073,9 @@ class PowerPoint2007 implements ReaderInterface
         if ($oElement instanceof DOMElement) {
             if ($oElement->hasAttribute('type')) {
                 $placeholder = new Placeholder($oElement->getAttribute('type'));
+                if ($oElement->hasAttribute('idx')) {
+                    $placeholder->setIdx((int) $oElement->getAttribute('idx'));
+                }
                 $oShape->setPlaceHolder($placeholder);
             }
         }
