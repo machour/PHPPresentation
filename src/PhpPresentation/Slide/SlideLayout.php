@@ -60,6 +60,13 @@ class SlideLayout extends AbstractSlide implements ComparableInterface, ShapeCon
     protected $layoutName;
 
     /**
+     * Slide layout type (e.g., "title", "obj", "secHead", etc.).
+     *
+     * @var null|string
+     */
+    protected $layoutType;
+
+    /**
      * Mapping of colors to the theme.
      *
      * @var ColorMap
@@ -94,5 +101,17 @@ class SlideLayout extends AbstractSlide implements ComparableInterface, ShapeCon
     public function getSlideMaster(): SlideMaster
     {
         return $this->slideMaster;
+    }
+
+    public function getLayoutType(): ?string
+    {
+        return $this->layoutType;
+    }
+
+    public function setLayoutType(string $layoutType): self
+    {
+        $this->layoutType = $layoutType;
+
+        return $this;
     }
 }

@@ -167,11 +167,11 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
         // p:sp\p:nvSpPr\p:cNvPr
         $objWriter->startElement('p:cNvPr');
         $objWriter->writeAttribute('id', $shapeId);
-        if ($shape->isPlaceholder()) {
-            $objWriter->writeAttribute('name', 'Placeholder for ' . $shape->getPlaceholder()->getType());
-        } else {
-            $objWriter->writeAttribute('name', $shape->getName());
+        $shapeName = $shape->getName();
+        if ('' === $shapeName && $shape->isPlaceholder()) {
+            $shapeName = 'Placeholder for ' . $shape->getPlaceholder()->getType();
         }
+        $objWriter->writeAttribute('name', $shapeName);
         // Hyperlink
         if ($shape->hasHyperlink()) {
             $this->writeHyperlink($objWriter, $shape);
@@ -179,9 +179,13 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
         // > p:sp\p:nvSpPr
         $objWriter->endElement();
         // p:sp\p:nvSpPr\p:cNvSpPr
-        $objWriter->startElement('p:cNvSpPr');
-        $objWriter->writeAttribute('txBox', '1');
-        $objWriter->endElement();
+        if (null !== $shape->getRawCNvSpPrXml()) {
+            $objWriter->writeRaw($shape->getRawCNvSpPrXml());
+        } else {
+            $objWriter->startElement('p:cNvSpPr');
+            $objWriter->writeAttribute('txBox', '1');
+            $objWriter->endElement();
+        }
         // p:sp\p:nvSpPr\p:nvPr
         if ($shape->isPlaceholder()) {
             $objWriter->startElement('p:nvPr');
@@ -190,6 +194,9 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
             if (null !== $shape->getPlaceholder()->getIdx()) {
                 $objWriter->writeAttribute('idx', $shape->getPlaceholder()->getIdx());
             }
+            if (null !== $shape->getPlaceholder()->getSz()) {
+                $objWriter->writeAttribute('sz', $shape->getPlaceholder()->getSz());
+            }
             $objWriter->endElement();
             $objWriter->endElement();
         } else {
@@ -197,88 +204,104 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
         }
         // > p:sp\p:nvSpPr
         $objWriter->endElement();
-        // p:sp\p:spPr
-        $objWriter->startElement('p:spPr');
 
-        // p:sp\p:spPr\a:xfrm
-        $objWriter->startElement('a:xfrm');
-        $objWriter->writeAttributeIf($shape->getRotation() != 0, 'rot', CommonDrawing::degreesToAngle($shape->getRotation()));
-        // p:sp\p:spPr\a:xfrm\a:off
-        $objWriter->startElement('a:off');
-        $objWriter->writeAttribute('x', CommonDrawing::pixelsToEmu($shape->getOffsetX()));
-        $objWriter->writeAttribute('y', CommonDrawing::pixelsToEmu($shape->getOffsetY()));
-        $objWriter->endElement();
-        // p:sp\p:spPr\a:xfrm\a:ext
-        $objWriter->startElement('a:ext');
-        $objWriter->writeAttribute('cx', CommonDrawing::pixelsToEmu($shape->getWidth()));
-        $objWriter->writeAttribute('cy', CommonDrawing::pixelsToEmu($shape->getHeight()));
-        $objWriter->endElement();
-        // > p:sp\p:spPr\a:xfrm
-        $objWriter->endElement();
-        // p:sp\p:spPr\a:prstGeom
-        $objWriter->startElement('a:prstGeom');
-        $objWriter->writeAttribute('prst', 'rect');
+        $isInheritedPlaceholder = $this->isInheritedPlaceholder($shape);
 
-        // p:sp\p:spPr\a:prstGeom\a:avLst
-        $objWriter->writeElement('a:avLst');
+        if ($isInheritedPlaceholder) {
+            // Write empty p:spPr to inherit position/size from layout
+            $objWriter->writeElement('p:spPr', null);
+        } else {
+            // p:sp\p:spPr
+            $objWriter->startElement('p:spPr');
 
-        $objWriter->endElement();
+            // p:sp\p:spPr\a:xfrm
+            $objWriter->startElement('a:xfrm');
+            $objWriter->writeAttributeIf($shape->getRotation() != 0, 'rot', CommonDrawing::degreesToAngle($shape->getRotation()));
+            // p:sp\p:spPr\a:xfrm\a:off
+            $objWriter->startElement('a:off');
+            $objWriter->writeAttribute('x', $shape->getOffsetXEmu() ?? CommonDrawing::pixelsToEmu($shape->getOffsetX()));
+            $objWriter->writeAttribute('y', $shape->getOffsetYEmu() ?? CommonDrawing::pixelsToEmu($shape->getOffsetY()));
+            $objWriter->endElement();
+            // p:sp\p:spPr\a:xfrm\a:ext
+            $objWriter->startElement('a:ext');
+            $objWriter->writeAttribute('cx', $shape->getWidthEmu() ?? CommonDrawing::pixelsToEmu($shape->getWidth()));
+            $objWriter->writeAttribute('cy', $shape->getHeightEmu() ?? CommonDrawing::pixelsToEmu($shape->getHeight()));
+            $objWriter->endElement();
+            // > p:sp\p:spPr\a:xfrm
+            $objWriter->endElement();
+            // p:sp\p:spPr\a:prstGeom
+            $objWriter->startElement('a:prstGeom');
+            $objWriter->writeAttribute('prst', 'rect');
 
-        $this->writeFill($objWriter, $shape->getFill());
-        $this->writeBorder($objWriter, $shape->getBorder(), '');
-        $this->writeShadow($objWriter, $shape->getShadow());
+            // p:sp\p:spPr\a:prstGeom\a:avLst
+            $objWriter->writeElement('a:avLst');
 
-        // > p:sp\p:spPr
-        $objWriter->endElement();
+            $objWriter->endElement();
+
+            $this->writeFill($objWriter, $shape->getFill());
+            $this->writeBorder($objWriter, $shape->getBorder(), '');
+            $this->writeShadow($objWriter, $shape->getShadow());
+
+            // > p:sp\p:spPr
+            $objWriter->endElement();
+        }
         // p:txBody
         $objWriter->startElement('p:txBody');
         // a:bodyPr
         //@link :http://msdn.microsoft.com/en-us/library/documentformat.openxml.drawing.bodyproperties%28v=office.14%29.aspx
-        $objWriter->startElement('a:bodyPr');
-        if (!$shape->isPlaceholder()) {
-            // Vertical alignment
-            $verticalAlign = $shape->getActiveParagraph()->getAlignment()->getVertical();
-            if (Alignment::VERTICAL_BASE != $verticalAlign && Alignment::VERTICAL_AUTO != $verticalAlign) {
-                $objWriter->writeAttribute('anchor', $verticalAlign);
-            }
-            $objWriter->writeAttribute('anchorCtr', $shape->getVerticalAlignCenter());
-            if (RichText::WRAP_SQUARE != $shape->getWrap()) {
-                $objWriter->writeAttribute('wrap', $shape->getWrap());
-            }
-            $objWriter->writeAttribute('rtlCol', '0');
-            if (RichText::OVERFLOW_OVERFLOW != $shape->getHorizontalOverflow()) {
-                $objWriter->writeAttribute('horzOverflow', $shape->getHorizontalOverflow());
-            }
-            if (RichText::OVERFLOW_OVERFLOW != $shape->getVerticalOverflow()) {
-                $objWriter->writeAttribute('vertOverflow', $shape->getVerticalOverflow());
-            }
-            if ($shape->isUpright()) {
-                $objWriter->writeAttribute('upright', '1');
-            }
-            $objWriter->writeAttribute('vert', $shape->isVertical() ? 'vert' : 'horz');
-            $objWriter->writeAttribute('bIns', CommonDrawing::pixelsToEmu($shape->getInsetBottom()));
-            $objWriter->writeAttribute('lIns', CommonDrawing::pixelsToEmu($shape->getInsetLeft()));
-            $objWriter->writeAttribute('rIns', CommonDrawing::pixelsToEmu($shape->getInsetRight()));
-            $objWriter->writeAttribute('tIns', CommonDrawing::pixelsToEmu($shape->getInsetTop()));
-            if ($shape->getColumns() != 1) {
-                $objWriter->writeAttribute('numCol', $shape->getColumns());
-                $objWriter->writeAttribute('spcCol', CommonDrawing::pixelsToEmu($shape->getColumnSpacing()));
-            }
-            // a:spAutoFit
-            $objWriter->startElement('a:' . $shape->getAutoFit());
-            if (RichText::AUTOFIT_NORMAL == $shape->getAutoFit()) {
-                if (null !== $shape->getFontScale()) {
-                    $objWriter->writeAttribute('fontScale', $shape->getFontScale() * 1000);
+        if (null !== $shape->getRawBodyPrXml()) {
+            $objWriter->writeRaw($shape->getRawBodyPrXml());
+        } else {
+            $objWriter->startElement('a:bodyPr');
+            if (!$shape->isPlaceholder()) {
+                // Vertical alignment
+                $verticalAlign = $shape->getActiveParagraph()->getAlignment()->getVertical();
+                if (Alignment::VERTICAL_BASE != $verticalAlign && Alignment::VERTICAL_AUTO != $verticalAlign) {
+                    $objWriter->writeAttribute('anchor', $verticalAlign);
                 }
-                if (null !== $shape->getLineSpaceReduction()) {
-                    $objWriter->writeAttribute('lnSpcReduction', $shape->getLineSpaceReduction() * 1000);
+                $objWriter->writeAttribute('anchorCtr', $shape->getVerticalAlignCenter());
+                if (RichText::WRAP_SQUARE != $shape->getWrap()) {
+                    $objWriter->writeAttribute('wrap', $shape->getWrap());
                 }
+                $objWriter->writeAttribute('rtlCol', '0');
+                if (RichText::OVERFLOW_OVERFLOW != $shape->getHorizontalOverflow()) {
+                    $objWriter->writeAttribute('horzOverflow', $shape->getHorizontalOverflow());
+                }
+                if (RichText::OVERFLOW_OVERFLOW != $shape->getVerticalOverflow()) {
+                    $objWriter->writeAttribute('vertOverflow', $shape->getVerticalOverflow());
+                }
+                if ($shape->isUpright()) {
+                    $objWriter->writeAttribute('upright', '1');
+                }
+                $objWriter->writeAttribute('vert', $shape->isVertical() ? 'vert' : 'horz');
+                $objWriter->writeAttribute('bIns', CommonDrawing::pixelsToEmu($shape->getInsetBottom()));
+                $objWriter->writeAttribute('lIns', CommonDrawing::pixelsToEmu($shape->getInsetLeft()));
+                $objWriter->writeAttribute('rIns', CommonDrawing::pixelsToEmu($shape->getInsetRight()));
+                $objWriter->writeAttribute('tIns', CommonDrawing::pixelsToEmu($shape->getInsetTop()));
+                if ($shape->getColumns() != 1) {
+                    $objWriter->writeAttribute('numCol', $shape->getColumns());
+                    $objWriter->writeAttribute('spcCol', CommonDrawing::pixelsToEmu($shape->getColumnSpacing()));
+                }
+                // a:spAutoFit
+                $objWriter->startElement('a:' . $shape->getAutoFit());
+                if (RichText::AUTOFIT_NORMAL == $shape->getAutoFit()) {
+                    if (null !== $shape->getFontScale()) {
+                        $objWriter->writeAttribute('fontScale', $shape->getFontScale() * 1000);
+                    }
+                    if (null !== $shape->getLineSpaceReduction()) {
+                        $objWriter->writeAttribute('lnSpcReduction', $shape->getLineSpaceReduction() * 1000);
+                    }
+                }
+                $objWriter->endElement();
             }
             $objWriter->endElement();
         }
-        $objWriter->endElement();
         // a:lstStyle
-        $objWriter->writeElement('a:lstStyle', null);
+        if (null !== $shape->getRawLstStyleXml()) {
+            $objWriter->writeRaw($shape->getRawLstStyleXml());
+        } else {
+            $objWriter->writeElement('a:lstStyle', null);
+        }
         if ($shape->isPlaceholder() &&
             (Placeholder::PH_TYPE_SLIDENUM == $shape->getPlaceholder()->getType() ||
                 Placeholder::PH_TYPE_DATETIME == $shape->getPlaceholder()->getType())
@@ -313,6 +336,13 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
             ));
             $objWriter->endElement();
             $objWriter->endElement();
+        } elseif ($isInheritedPlaceholder) {
+            // Write minimal paragraph to preserve layout text inheritance
+            $this->writePlaceholderParagraphs($objWriter, $shape->getParagraphs());
+        } elseif ($shape->isPlaceholder() && $this->hasAllDefaultRuns($shape)) {
+            // Placeholder with all-default text (e.g., layout placeholder template text)
+            // Write minimal paragraphs to preserve inheritance from master
+            $this->writePlaceholderParagraphs($objWriter, $shape->getParagraphs());
         } else {
             // Write paragraphs
             $this->writeParagraphs($objWriter, $shape->getParagraphs());
@@ -558,6 +588,119 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
 
             $objWriter->endElement();
         }
+    }
+
+    /**
+     * Write paragraphs for inherited placeholder shapes.
+     *
+     * When a placeholder on a slide has no explicit geometry (inheriting from
+     * layout), we write minimal paragraph markup so text formatting is also
+     * inherited from the layout/master rather than being overridden.
+     *
+     * @param array<Paragraph> $paragraphs
+     */
+    protected function writePlaceholderParagraphs(XMLWriter $objWriter, array $paragraphs): void
+    {
+        foreach ($paragraphs as $paragraph) {
+            $objWriter->startElement('a:p');
+
+            // Only write text runs that have actual content
+            $elements = $paragraph->getRichTextElements();
+            foreach ($elements as $element) {
+                if ($element instanceof BreakElement) {
+                    $objWriter->writeElement('a:br', null);
+                } elseif ($element instanceof Run || $element instanceof TextElement) {
+                    $text = $element->getText();
+                    if ('' !== $text) {
+                        $objWriter->startElement('a:r');
+                        if ($element instanceof Run) {
+                            if ($this->hasDefaultFontProperties($element)) {
+                                $this->writeMinimalRunStyles($objWriter, $element);
+                            } else {
+                                $this->writeRunStyles($objWriter, $element);
+                            }
+                        }
+                        $objWriter->startElement('a:t');
+                        $objWriter->writeCData(Text::controlCharacterPHP2OOXML($text));
+                        $objWriter->endElement();
+                        $objWriter->endElement();
+                    }
+                }
+            }
+
+            $objWriter->endElement();
+        }
+    }
+
+    /**
+     * Check if a shape is a placeholder that should inherit geometry from layout.
+     *
+     * When a placeholder shape has zero position and dimensions, it means no
+     * explicit geometry was defined and it should inherit from the slide layout.
+     */
+    protected function isInheritedPlaceholder(RichText $shape): bool
+    {
+        return $shape->isPlaceholder()
+            && 0 === $shape->getOffsetX()
+            && 0 === $shape->getOffsetY()
+            && 0 === $shape->getWidth()
+            && 0 === $shape->getHeight();
+    }
+
+    /**
+     * Check if a Run element has all default font properties.
+     *
+     * When true, the run was likely loaded from XML with minimal formatting
+     * (e.g., only lang attribute) and should be written back minimally to
+     * preserve formatting inheritance from master/layout.
+     */
+    protected function hasDefaultFontProperties(Run $element): bool
+    {
+        $font = $element->getFont();
+
+        return !$font->isBold()
+            && !$font->isItalic()
+            && Font::STRIKE_NONE === $font->getStrikethrough()
+            && 10 === $font->getSize()
+            && Font::UNDERLINE_NONE === $font->getUnderline()
+            && Font::CAPITALIZATION_NONE === $font->getCapitalization()
+            && 0 === $font->getBaseline()
+            && 0.0 === $font->getCharacterSpacing()
+            && 'Calibri' === $font->getName()
+            && Font::FORMAT_LATIN === $font->getFormat()
+            && Color::COLOR_BLACK === $font->getColor()->getARGB();
+    }
+
+    /**
+     * Write minimal run styles (a:rPr) for placeholder shapes.
+     *
+     * Only writes the lang attribute, allowing text styling to be
+     * inherited from the layout or master slide.
+     */
+    protected function writeMinimalRunStyles(XMLWriter $objWriter, Run $element): void
+    {
+        $objWriter->startElement('a:rPr');
+        $objWriter->writeAttribute('lang', ($element->getLanguage() ? $element->getLanguage() : 'en-US'));
+        $objWriter->endElement();
+    }
+
+    /**
+     * Check if all runs in a shape have default font properties.
+     *
+     * Used to determine if placeholder text should be written with
+     * minimal formatting to preserve master/layout inheritance.
+     */
+    protected function hasAllDefaultRuns(RichText $shape): bool
+    {
+        foreach ($shape->getParagraphs() as $paragraph) {
+            foreach ($paragraph->getRichTextElements() as $element) {
+                if ($element instanceof Run && !$this->hasDefaultFontProperties($element)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -1565,7 +1708,7 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
         if ($oBackground instanceof Slide\Background\SchemeColor) {
             // p:bgRef
             $objWriter->startElement('p:bgRef');
-            $objWriter->writeAttribute('idx', '1001');
+            $objWriter->writeAttribute('idx', (string) $oBackground->getIndex());
             // a:schemeClr
             $objWriter->startElement('a:schemeClr');
             $objWriter->writeAttribute('val', $oBackground->getSchemeColor()->getValue());

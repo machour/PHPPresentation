@@ -56,6 +56,37 @@ class SlideMaster extends AbstractSlide implements ComparableInterface, ShapeCon
     protected $arraySchemeColor = [];
 
     /**
+     * Theme font scheme data.
+     *
+     * @var array{
+     *     majorFont: array{latin: string, ea: string, cs: string, fonts: array<string, string>},
+     *     minorFont: array{latin: string, ea: string, cs: string, fonts: array<string, string>}
+     * }|null
+     */
+    protected $themeFonts = null;
+
+    /**
+     * Raw theme XML for verbatim replay during writing.
+     *
+     * @var string|null
+     */
+    protected $themeXml = null;
+
+    /**
+     * Raw theme relationships XML for verbatim replay during writing.
+     *
+     * @var string|null
+     */
+    protected $themeRelsXml = null;
+
+    /**
+     * Theme media files (zip path => binary content).
+     *
+     * @var array<string, string>
+     */
+    protected $themeMedia = [];
+
+    /**
      * @var array<string, string>
      */
     protected $defaultSchemeColor = [
@@ -152,5 +183,71 @@ class SlideMaster extends AbstractSlide implements ComparableInterface, ShapeCon
     public function getAllSchemeColors(): array
     {
         return $this->arraySchemeColor;
+    }
+
+    /**
+     * @param array{
+     *     majorFont: array{latin: string, ea: string, cs: string, fonts: array<string, string>},
+     *     minorFont: array{latin: string, ea: string, cs: string, fonts: array<string, string>}
+     * } $themeFonts
+     */
+    public function setThemeFonts(array $themeFonts): self
+    {
+        $this->themeFonts = $themeFonts;
+
+        return $this;
+    }
+
+    /**
+     * @return array{
+     *     majorFont: array{latin: string, ea: string, cs: string, fonts: array<string, string>},
+     *     minorFont: array{latin: string, ea: string, cs: string, fonts: array<string, string>}
+     * }|null
+     */
+    public function getThemeFonts(): ?array
+    {
+        return $this->themeFonts;
+    }
+
+    public function setThemeXml(?string $themeXml): self
+    {
+        $this->themeXml = $themeXml;
+
+        return $this;
+    }
+
+    public function getThemeXml(): ?string
+    {
+        return $this->themeXml;
+    }
+
+    public function setThemeRelsXml(?string $themeRelsXml): self
+    {
+        $this->themeRelsXml = $themeRelsXml;
+
+        return $this;
+    }
+
+    public function getThemeRelsXml(): ?string
+    {
+        return $this->themeRelsXml;
+    }
+
+    /**
+     * @param array<string, string> $themeMedia
+     */
+    public function setThemeMedia(array $themeMedia): self
+    {
+        $this->themeMedia = $themeMedia;
+
+        return $this;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getThemeMedia(): array
+    {
+        return $this->themeMedia;
     }
 }

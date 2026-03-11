@@ -633,9 +633,51 @@ class PowerPoint2007 implements ReaderInterface
             // Load the theme
             foreach ($this->arrayRels[$oSlideMaster->getRelsIndex()] as $arrayRel) {
                 if ('http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme' == $arrayRel['Type']) {
-                    $pptTheme = $this->oZip->getFromName('ppt/' . substr($arrayRel['Target'], strrpos($arrayRel['Target'], '../') + 3));
+                    $themeBasename = substr($arrayRel['Target'], strrpos($arrayRel['Target'], '../') + 3);
+                    $themePath = 'ppt/' . $themeBasename;
+                    $pptTheme = $this->oZip->getFromName($themePath);
                     if (false !== $pptTheme) {
                         $this->loadTheme($pptTheme, $oSlideMaster);
+
+                        // Store raw theme XML for verbatim replay during writing
+                        $oSlideMaster->setThemeXml($pptTheme);
+
+                        // Load and store theme-referenced media files
+                        $themeRelsPath = 'ppt/theme/_rels/' . basename($themeBasename) . '.rels';
+                        $themeRelsContent = $this->oZip->getFromName($themeRelsPath);
+                        if (false !== $themeRelsContent) {
+                            // Store raw rels XML for verbatim replay during writing
+                            $oSlideMaster->setThemeRelsXml($themeRelsContent);
+
+                            $themeMedia = [];
+                            $relsReader = new XMLReader();
+                            // @phpstan-ignore-next-line
+                            if ($relsReader->getDomFromString($themeRelsContent)) {
+                                foreach ($relsReader->getElements('*') as $relNode) {
+                                    if (!($relNode instanceof DOMElement)) {
+                                        continue;
+                                    }
+                                    $relType = $relNode->getAttribute('Type');
+                                    $relTarget = $relNode->getAttribute('Target');
+                                    if ('http://schemas.openxmlformats.org/officeDocument/2006/relationships/image' == $relType) {
+                                        // Resolve the path relative to theme directory
+                                        $mediaPath = 'ppt/theme/' . $relTarget;
+                                        $mediaPath = explode('/', $mediaPath);
+                                        foreach ($mediaPath as $key => $partPath) {
+                                            if ('..' == $partPath) {
+                                                unset($mediaPath[$key - 1], $mediaPath[$key]);
+                                            }
+                                        }
+                                        $mediaPath = implode('/', $mediaPath);
+                                        $mediaContent = $this->oZip->getFromName($mediaPath);
+                                        if (false !== $mediaContent) {
+                                            $themeMedia[$mediaPath] = $mediaContent;
+                                        }
+                                    }
+                                }
+                            }
+                            $oSlideMaster->setThemeMedia($themeMedia);
+                        }
                     }
 
                     break;
@@ -672,6 +714,12 @@ class PowerPoint2007 implements ReaderInterface
             // Core
             $oSlideLayout = new SlideLayout($oSlideMaster);
             $oSlideLayout->setRelsIndex('ppt/slideLayouts/_rels/' . $baseFile . '.rels');
+
+            // Type
+            $oElement = $xmlReader->getElement('/p:sldLayout');
+            if ($oElement instanceof DOMElement && $oElement->hasAttribute('type')) {
+                $oSlideLayout->setLayoutType($oElement->getAttribute('type'));
+            }
 
             // Name
             $oElement = $xmlReader->getElement('/p:sldLayout/p:cSld');
@@ -728,6 +776,37 @@ class PowerPoint2007 implements ReaderInterface
                     $oSlideMaster->addSchemeColor($oSchemeColor);
                 }
             }
+
+            // Font Scheme
+            $themeFonts = [];
+            foreach (['majorFont', 'minorFont'] as $fontType) {
+                $fontData = ['latin' => '', 'ea' => '', 'cs' => '', 'fonts' => []];
+                $oFontElement = $xmlReader->getElement('/a:theme/a:themeElements/a:fontScheme/a:' . $fontType);
+                if ($oFontElement instanceof DOMElement) {
+                    $oLatin = $xmlReader->getElement('a:latin', $oFontElement);
+                    if ($oLatin instanceof DOMElement && $oLatin->hasAttribute('typeface')) {
+                        $fontData['latin'] = $oLatin->getAttribute('typeface');
+                    }
+                    $oEa = $xmlReader->getElement('a:ea', $oFontElement);
+                    if ($oEa instanceof DOMElement && $oEa->hasAttribute('typeface')) {
+                        $fontData['ea'] = $oEa->getAttribute('typeface');
+                    }
+                    $oCs = $xmlReader->getElement('a:cs', $oFontElement);
+                    if ($oCs instanceof DOMElement && $oCs->hasAttribute('typeface')) {
+                        $fontData['cs'] = $oCs->getAttribute('typeface');
+                    }
+                    $oFonts = $xmlReader->getElements('a:font', $oFontElement);
+                    foreach ($oFonts as $oFont) {
+                        if ($oFont instanceof DOMElement && $oFont->hasAttribute('script') && $oFont->hasAttribute('typeface')) {
+                            $fontData['fonts'][$oFont->getAttribute('script')] = $oFont->getAttribute('typeface');
+                        }
+                    }
+                }
+                $themeFonts[$fontType] = $fontData;
+            }
+            if (!empty($themeFonts['majorFont']['latin']) || !empty($themeFonts['minorFont']['latin'])) {
+                $oSlideMaster->setThemeFonts($themeFonts);
+            }
         }
     }
 
@@ -747,6 +826,7 @@ class PowerPoint2007 implements ReaderInterface
         }
 
         // Background scheme color
+        $oElementBgRef = $xmlReader->getElement('p:bgRef', $oElement);
         $oElementSchemeColor = $xmlReader->getElement('p:bgRef/a:schemeClr', $oElement);
         if ($oElementSchemeColor instanceof DOMElement) {
             // Color
@@ -755,6 +835,9 @@ class PowerPoint2007 implements ReaderInterface
             // Background
             $oBackground = new Slide\Background\SchemeColor();
             $oBackground->setSchemeColor($oColor);
+            if ($oElementBgRef instanceof DOMElement && $oElementBgRef->hasAttribute('idx')) {
+                $oBackground->setIndex((int) $oElementBgRef->getAttribute('idx'));
+            }
             // Slide Background
             $oSlide->setBackground($oBackground);
         }
@@ -874,20 +957,28 @@ class PowerPoint2007 implements ReaderInterface
         $oElement = $document->getElement('p:spPr/a:xfrm/a:off', $node);
         if ($oElement instanceof DOMElement) {
             if ($oElement->hasAttribute('x')) {
-                $oShape->setOffsetX((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('x')));
+                $emuX = (int) $oElement->getAttribute('x');
+                $oShape->setOffsetX((int) CommonDrawing::emuToPixels($emuX));
+                $oShape->setOffsetXEmu($emuX);
             }
             if ($oElement->hasAttribute('y')) {
-                $oShape->setOffsetY((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('y')));
+                $emuY = (int) $oElement->getAttribute('y');
+                $oShape->setOffsetY((int) CommonDrawing::emuToPixels($emuY));
+                $oShape->setOffsetYEmu($emuY);
             }
         }
 
         $oElement = $document->getElement('p:spPr/a:xfrm/a:ext', $node);
         if ($oElement instanceof DOMElement) {
             if ($oElement->hasAttribute('cx')) {
-                $oShape->setWidth((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('cx')));
+                $emuCx = (int) $oElement->getAttribute('cx');
+                $oShape->setWidth((int) CommonDrawing::emuToPixels($emuCx));
+                $oShape->setWidthEmu($emuCx);
             }
             if ($oElement->hasAttribute('cy')) {
-                $oShape->setHeight((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('cy')));
+                $emuCy = (int) $oElement->getAttribute('cy');
+                $oShape->setHeight((int) CommonDrawing::emuToPixels($emuCy));
+                $oShape->setHeightEmu($emuCy);
             }
         }
         // Load shape effects
@@ -975,20 +1066,28 @@ class PowerPoint2007 implements ReaderInterface
         $oElement = $document->getElement('p:spPr/a:xfrm/a:off', $node);
         if ($oElement instanceof DOMElement) {
             if ($oElement->hasAttribute('x')) {
-                $oShape->setOffsetX((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('x')));
+                $emuX = (int) $oElement->getAttribute('x');
+                $oShape->setOffsetX((int) CommonDrawing::emuToPixels($emuX));
+                $oShape->setOffsetXEmu($emuX);
             }
             if ($oElement->hasAttribute('y')) {
-                $oShape->setOffsetY((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('y')));
+                $emuY = (int) $oElement->getAttribute('y');
+                $oShape->setOffsetY((int) CommonDrawing::emuToPixels($emuY));
+                $oShape->setOffsetYEmu($emuY);
             }
         }
 
         $oElement = $document->getElement('p:spPr/a:xfrm/a:ext', $node);
         if ($oElement instanceof DOMElement) {
             if ($oElement->hasAttribute('cx')) {
-                $oShape->setWidth((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('cx')));
+                $emuCx = (int) $oElement->getAttribute('cx');
+                $oShape->setWidth((int) CommonDrawing::emuToPixels($emuCx));
+                $oShape->setWidthEmu($emuCx);
             }
             if ($oElement->hasAttribute('cy')) {
-                $oShape->setHeight((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('cy')));
+                $emuCy = (int) $oElement->getAttribute('cy');
+                $oShape->setHeight((int) CommonDrawing::emuToPixels($emuCy));
+                $oShape->setHeightEmu($emuCy);
             }
         }
 
@@ -996,6 +1095,12 @@ class PowerPoint2007 implements ReaderInterface
         if ($oElement instanceof DOMElement) {
             if ($oElement->hasAttribute('type')) {
                 $placeholder = new Placeholder($oElement->getAttribute('type'));
+                if ($oElement->hasAttribute('idx')) {
+                    $placeholder->setIdx((int) $oElement->getAttribute('idx'));
+                }
+                if ($oElement->hasAttribute('sz')) {
+                    $placeholder->setSz($oElement->getAttribute('sz'));
+                }
                 $oShape->setPlaceHolder($placeholder);
             }
         }
@@ -1012,20 +1117,34 @@ class PowerPoint2007 implements ReaderInterface
         $bodyPr = $document->getElement('p:txBody/a:bodyPr', $node);
         if ($bodyPr instanceof DOMElement) {
             if ($bodyPr->hasAttribute('lIns')) {
-                $oShape->setInsetLeft((int) $bodyPr->getAttribute('lIns'));
+                $oShape->setInsetLeft(CommonDrawing::emuToPixels((int) $bodyPr->getAttribute('lIns')));
             }
             if ($bodyPr->hasAttribute('tIns')) {
-                $oShape->setInsetTop((int) $bodyPr->getAttribute('tIns'));
+                $oShape->setInsetTop(CommonDrawing::emuToPixels((int) $bodyPr->getAttribute('tIns')));
             }
             if ($bodyPr->hasAttribute('rIns')) {
-                $oShape->setInsetRight((int) $bodyPr->getAttribute('rIns'));
+                $oShape->setInsetRight(CommonDrawing::emuToPixels((int) $bodyPr->getAttribute('rIns')));
             }
             if ($bodyPr->hasAttribute('bIns')) {
-                $oShape->setInsetBottom((int) $bodyPr->getAttribute('bIns'));
+                $oShape->setInsetBottom(CommonDrawing::emuToPixels((int) $bodyPr->getAttribute('bIns')));
             }
             if ($bodyPr->hasAttribute('anchorCtr')) {
                 $oShape->setVerticalAlignCenter((int) $bodyPr->getAttribute('anchorCtr'));
             }
+            // Store raw bodyPr XML for round-trip fidelity
+            $oShape->setRawBodyPrXml($bodyPr->ownerDocument->saveXML($bodyPr));
+        }
+
+        // Store raw lstStyle XML for round-trip fidelity
+        $lstStyle = $document->getElement('p:txBody/a:lstStyle', $node);
+        if ($lstStyle instanceof DOMElement) {
+            $oShape->setRawLstStyleXml($lstStyle->ownerDocument->saveXML($lstStyle));
+        }
+
+        // Store raw cNvSpPr XML for round-trip fidelity
+        $cNvSpPr = $document->getElement('p:nvSpPr/p:cNvSpPr', $node);
+        if ($cNvSpPr instanceof DOMElement) {
+            $oShape->setRawCNvSpPrXml($cNvSpPr->ownerDocument->saveXML($cNvSpPr));
         }
 
         $arrayElements = $document->getElements('p:txBody/a:p', $node);

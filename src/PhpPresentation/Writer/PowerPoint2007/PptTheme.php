@@ -29,7 +29,29 @@ class PptTheme extends AbstractDecoratorWriter
     public function render(): ZipInterface
     {
         foreach ($this->oPresentation->getAllMasterSlides() as $oMasterSlide) {
-            $this->getZip()->addFromString('ppt/theme/theme' . $oMasterSlide->getRelsIndex() . '.xml', $this->writeTheme($oMasterSlide));
+            $themeIndex = $oMasterSlide->getRelsIndex();
+
+            // If raw theme XML is available (loaded from file), use it verbatim
+            $rawThemeXml = $oMasterSlide->getThemeXml();
+            if (null !== $rawThemeXml) {
+                $this->getZip()->addFromString('ppt/theme/theme' . $themeIndex . '.xml', $rawThemeXml);
+
+                // Write theme-referenced media files
+                foreach ($oMasterSlide->getThemeMedia() as $mediaPath => $mediaContent) {
+                    $this->getZip()->addFromString($mediaPath, $mediaContent);
+                }
+
+                // Write theme rels if available
+                $rawThemeRelsXml = $oMasterSlide->getThemeRelsXml();
+                if (null !== $rawThemeRelsXml) {
+                    $this->getZip()->addFromString(
+                        'ppt/theme/_rels/theme' . $themeIndex . '.xml.rels',
+                        $rawThemeRelsXml
+                    );
+                }
+            } else {
+                $this->getZip()->addFromString('ppt/theme/theme' . $themeIndex . '.xml', $this->writeTheme($oMasterSlide));
+            }
         }
 
         return $this->getZip();
@@ -73,6 +95,8 @@ class PptTheme extends AbstractDecoratorWriter
             'Viet' => 'Times New Roman',
             'Uigh' => 'Microsoft Uighur',
         ];
+
+        $themeFonts = $oMasterSlide->getThemeFonts() ?? [];
 
         // Create XML writer
         $objWriter = new XMLWriter(XMLWriter::STORAGE_MEMORY);
@@ -127,20 +151,21 @@ class PptTheme extends AbstractDecoratorWriter
 
         // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:latin
         $objWriter->startElement('a:latin');
-        $objWriter->writeAttribute('typeface', 'Calibri');
+        $objWriter->writeAttribute('typeface', $themeFonts['majorFont']['latin'] ?? 'Calibri');
         $objWriter->endElement();
 
         // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:ea
         $objWriter->startElement('a:ea');
-        $objWriter->writeAttribute('typeface', '');
+        $objWriter->writeAttribute('typeface', $themeFonts['majorFont']['ea'] ?? '');
         $objWriter->endElement();
 
         // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:cs
         $objWriter->startElement('a:cs');
-        $objWriter->writeAttribute('typeface', '');
+        $objWriter->writeAttribute('typeface', $themeFonts['majorFont']['cs'] ?? '');
         $objWriter->endElement();
 
-        foreach ($arrayFont as $script => $typeface) {
+        $majorFonts = $themeFonts['majorFont']['fonts'] ?? $arrayFont;
+        foreach ($majorFonts as $script => $typeface) {
             // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:font
             $objWriter->startElement('a:font');
             $objWriter->writeAttribute('script', $script);
@@ -154,23 +179,24 @@ class PptTheme extends AbstractDecoratorWriter
         // a:theme/a:themeElements/a:fontScheme/a:minorFont
         $objWriter->startElement('a:minorFont');
 
-        // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:latin
+        // a:theme/a:themeElements/a:fontScheme/a:minorFont/a:latin
         $objWriter->startElement('a:latin');
-        $objWriter->writeAttribute('typeface', 'Calibri');
+        $objWriter->writeAttribute('typeface', $themeFonts['minorFont']['latin'] ?? 'Calibri');
         $objWriter->endElement();
 
-        // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:ea
+        // a:theme/a:themeElements/a:fontScheme/a:minorFont/a:ea
         $objWriter->startElement('a:ea');
-        $objWriter->writeAttribute('typeface', '');
+        $objWriter->writeAttribute('typeface', $themeFonts['minorFont']['ea'] ?? '');
         $objWriter->endElement();
 
-        // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:cs
+        // a:theme/a:themeElements/a:fontScheme/a:minorFont/a:cs
         $objWriter->startElement('a:cs');
-        $objWriter->writeAttribute('typeface', '');
+        $objWriter->writeAttribute('typeface', $themeFonts['minorFont']['cs'] ?? '');
         $objWriter->endElement();
 
-        foreach ($arrayFont as $script => $typeface) {
-            // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:font
+        $minorFonts = $themeFonts['minorFont']['fonts'] ?? $arrayFont;
+        foreach ($minorFonts as $script => $typeface) {
+            // a:theme/a:themeElements/a:fontScheme/a:minorFont/a:font
             $objWriter->startElement('a:font');
             $objWriter->writeAttribute('script', $script);
             $objWriter->writeAttribute('typeface', $typeface);
