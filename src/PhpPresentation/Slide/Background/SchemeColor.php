@@ -31,6 +31,13 @@ class SchemeColor extends AbstractBackground
     protected $schemeColor;
 
     /**
+     * Background reference index.
+     *
+     * @var int
+     */
+    protected $idx = 1001;
+
+    /**
      * @return $this
      */
     public function setSchemeColor(?StyleSchemeColor $color = null): self
@@ -43,5 +50,17 @@ class SchemeColor extends AbstractBackground
     public function getSchemeColor(): ?StyleSchemeColor
     {
         return $this->schemeColor;
+    }
+
+    public function setIndex(int $idx): self
+    {
+        $this->idx = $idx;
+
+        return $this;
+    }
+
+    public function getIndex(): int
+    {
+        return $this->idx;
     }
 }

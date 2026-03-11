@@ -29,7 +29,29 @@ class PptTheme extends AbstractDecoratorWriter
     public function render(): ZipInterface
     {
         foreach ($this->oPresentation->getAllMasterSlides() as $oMasterSlide) {
-            $this->getZip()->addFromString('ppt/theme/theme' . $oMasterSlide->getRelsIndex() . '.xml', $this->writeTheme($oMasterSlide));
+            $themeIndex = $oMasterSlide->getRelsIndex();
+
+            // If raw theme XML is available (loaded from file), use it verbatim
+            $rawThemeXml = $oMasterSlide->getThemeXml();
+            if (null !== $rawThemeXml) {
+                $this->getZip()->addFromString('ppt/theme/theme' . $themeIndex . '.xml', $rawThemeXml);
+
+                // Write theme-referenced media files
+                foreach ($oMasterSlide->getThemeMedia() as $mediaPath => $mediaContent) {
+                    $this->getZip()->addFromString($mediaPath, $mediaContent);
+                }
+
+                // Write theme rels if available
+                $rawThemeRelsXml = $oMasterSlide->getThemeRelsXml();
+                if (null !== $rawThemeRelsXml) {
+                    $this->getZip()->addFromString(
+                        'ppt/theme/_rels/theme' . $themeIndex . '.xml.rels',
+                        $rawThemeRelsXml
+                    );
+                }
+            } else {
+                $this->getZip()->addFromString('ppt/theme/theme' . $themeIndex . '.xml', $this->writeTheme($oMasterSlide));
+            }
         }
 
         return $this->getZip();

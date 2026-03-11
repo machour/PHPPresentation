@@ -633,9 +633,51 @@ class PowerPoint2007 implements ReaderInterface
             // Load the theme
             foreach ($this->arrayRels[$oSlideMaster->getRelsIndex()] as $arrayRel) {
                 if ('http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme' == $arrayRel['Type']) {
-                    $pptTheme = $this->oZip->getFromName('ppt/' . substr($arrayRel['Target'], strrpos($arrayRel['Target'], '../') + 3));
+                    $themeBasename = substr($arrayRel['Target'], strrpos($arrayRel['Target'], '../') + 3);
+                    $themePath = 'ppt/' . $themeBasename;
+                    $pptTheme = $this->oZip->getFromName($themePath);
                     if (false !== $pptTheme) {
                         $this->loadTheme($pptTheme, $oSlideMaster);
+
+                        // Store raw theme XML for verbatim replay during writing
+                        $oSlideMaster->setThemeXml($pptTheme);
+
+                        // Load and store theme-referenced media files
+                        $themeRelsPath = 'ppt/theme/_rels/' . basename($themeBasename) . '.rels';
+                        $themeRelsContent = $this->oZip->getFromName($themeRelsPath);
+                        if (false !== $themeRelsContent) {
+                            // Store raw rels XML for verbatim replay during writing
+                            $oSlideMaster->setThemeRelsXml($themeRelsContent);
+
+                            $themeMedia = [];
+                            $relsReader = new XMLReader();
+                            // @phpstan-ignore-next-line
+                            if ($relsReader->getDomFromString($themeRelsContent)) {
+                                foreach ($relsReader->getElements('*') as $relNode) {
+                                    if (!($relNode instanceof DOMElement)) {
+                                        continue;
+                                    }
+                                    $relType = $relNode->getAttribute('Type');
+                                    $relTarget = $relNode->getAttribute('Target');
+                                    if ('http://schemas.openxmlformats.org/officeDocument/2006/relationships/image' == $relType) {
+                                        // Resolve the path relative to theme directory
+                                        $mediaPath = 'ppt/theme/' . $relTarget;
+                                        $mediaPath = explode('/', $mediaPath);
+                                        foreach ($mediaPath as $key => $partPath) {
+                                            if ('..' == $partPath) {
+                                                unset($mediaPath[$key - 1], $mediaPath[$key]);
+                                            }
+                                        }
+                                        $mediaPath = implode('/', $mediaPath);
+                                        $mediaContent = $this->oZip->getFromName($mediaPath);
+                                        if (false !== $mediaContent) {
+                                            $themeMedia[$mediaPath] = $mediaContent;
+                                        }
+                                    }
+                                }
+                            }
+                            $oSlideMaster->setThemeMedia($themeMedia);
+                        }
                     }
 
                     break;
@@ -778,6 +820,7 @@ class PowerPoint2007 implements ReaderInterface
         }
 
         // Background scheme color
+        $oElementBgRef = $xmlReader->getElement('p:bgRef', $oElement);
         $oElementSchemeColor = $xmlReader->getElement('p:bgRef/a:schemeClr', $oElement);
         if ($oElementSchemeColor instanceof DOMElement) {
             // Color
@@ -786,6 +829,9 @@ class PowerPoint2007 implements ReaderInterface
             // Background
             $oBackground = new Slide\Background\SchemeColor();
             $oBackground->setSchemeColor($oColor);
+            if ($oElementBgRef instanceof DOMElement && $oElementBgRef->hasAttribute('idx')) {
+                $oBackground->setIndex((int) $oElementBgRef->getAttribute('idx'));
+            }
             // Slide Background
             $oSlide->setBackground($oBackground);
         }

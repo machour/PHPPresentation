@@ -1565,7 +1565,7 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
         if ($oBackground instanceof Slide\Background\SchemeColor) {
             // p:bgRef
             $objWriter->startElement('p:bgRef');
-            $objWriter->writeAttribute('idx', '1001');
+            $objWriter->writeAttribute('idx', (string) $oBackground->getIndex());
             // a:schemeClr
             $objWriter->startElement('a:schemeClr');
             $objWriter->writeAttribute('val', $oBackground->getSchemeColor()->getValue());

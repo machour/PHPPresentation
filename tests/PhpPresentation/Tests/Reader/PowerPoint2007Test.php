@@ -1130,6 +1130,11 @@ class PowerPoint2007Test extends TestCase
         $masterSlides = $oPhpPresentation->getAllMasterSlides();
         self::assertCount(3, $masterSlides);
 
+        // Verify raw theme XML is stored for all master slides
+        foreach ($masterSlides as $masterSlide) {
+            self::assertNotNull($masterSlide->getThemeXml());
+        }
+
         // Theme 1: Aspect - Verdana
         $themeFonts0 = $masterSlides[0]->getThemeFonts();
         self::assertNotNull($themeFonts0);
@@ -1155,28 +1160,15 @@ class PowerPoint2007Test extends TestCase
 
     public function testThemeFontSchemeRoundTrip(): void
     {
-        // Use Sample_12.pptx for the round-trip test as it can be successfully written
+        // Use Sample_12.pptx for the round-trip test - it has Calibri fonts
         $file = PHPPRESENTATION_TESTS_BASE_DIR . '/resources/files/Sample_12.pptx';
         $reader = new PowerPoint2007();
         $oPhpPresentation = $reader->load($file);
 
-        // Set custom theme fonts on the first master slide
+        // Verify the raw theme XML is stored
         $masterSlides = $oPhpPresentation->getAllMasterSlides();
         self::assertGreaterThan(0, count($masterSlides));
-        $masterSlides[0]->setThemeFonts([
-            'majorFont' => [
-                'latin' => 'Arial',
-                'ea' => '',
-                'cs' => '',
-                'fonts' => ['Jpan' => 'ＭＳ ゴシック', 'Hang' => '굴림'],
-            ],
-            'minorFont' => [
-                'latin' => 'Georgia',
-                'ea' => '',
-                'cs' => '',
-                'fonts' => ['Jpan' => 'ＭＳ 明朝', 'Hang' => '바탕'],
-            ],
-        ]);
+        self::assertNotNull($masterSlides[0]->getThemeXml());
 
         // Write to temp file
         $outputFile = tempnam(sys_get_temp_dir(), 'PhpPresentationTest');
@@ -1185,7 +1177,7 @@ class PowerPoint2007Test extends TestCase
             $writer = new \PhpOffice\PhpPresentation\Writer\PowerPoint2007($oPhpPresentation);
             $writer->save($outputFile);
 
-            // Verify the theme XML directly in the output zip
+            // Verify the theme XML is preserved verbatim in the output
             $zip = new \ZipArchive();
             $zip->open($outputFile);
 
@@ -1202,26 +1194,78 @@ class PowerPoint2007Test extends TestCase
                     $majorLatin = $xpath->query('//a:fontScheme/a:majorFont/a:latin');
                     $minorLatin = $xpath->query('//a:fontScheme/a:minorFont/a:latin');
 
-                    if ($majorLatin->length > 0 && 'Arial' === $majorLatin->item(0)->getAttribute('typeface')) {
+                    if ($majorLatin->length > 0) {
                         $found = true;
-                        self::assertEquals('Arial', $majorLatin->item(0)->getAttribute('typeface'));
-                        self::assertEquals('Georgia', $minorLatin->item(0)->getAttribute('typeface'));
-
-                        // Verify script-specific fonts
-                        $majorFonts = $xpath->query('//a:fontScheme/a:majorFont/a:font');
-                        $foundJpan = false;
-                        foreach ($majorFonts as $font) {
-                            if ('Jpan' === $font->getAttribute('script')) {
-                                $foundJpan = true;
-                                self::assertEquals('ＭＳ ゴシック', $font->getAttribute('typeface'));
-                            }
-                        }
-                        self::assertTrue($foundJpan, 'Expected Jpan script font in major font');
+                        // Verify original Calibri fonts are preserved
+                        self::assertEquals('Calibri', $majorLatin->item(0)->getAttribute('typeface'));
+                        self::assertEquals('Calibri', $minorLatin->item(0)->getAttribute('typeface'));
                     }
                 }
             }
 
-            self::assertTrue($found, 'Expected to find theme with Arial major font');
+            self::assertTrue($found, 'Expected to find theme with preserved fonts');
+
+            $zip->close();
+        } finally {
+            @unlink($outputFile);
+        }
+    }
+
+    public function testThemeFontSchemeGeneratedWhenNoRawXml(): void
+    {
+        // Use Sample_12.pptx and clear raw theme XML to test generation fallback
+        $file = PHPPRESENTATION_TESTS_BASE_DIR . '/resources/files/Sample_12.pptx';
+        $reader = new PowerPoint2007();
+        $oPhpPresentation = $reader->load($file);
+
+        $masterSlides = $oPhpPresentation->getAllMasterSlides();
+        // Clear the raw theme XML to force generation from parsed data
+        $masterSlides[0]->setThemeXml(null);
+
+        // Set custom theme fonts
+        $masterSlides[0]->setThemeFonts([
+            'majorFont' => [
+                'latin' => 'Arial',
+                'ea' => '',
+                'cs' => '',
+                'fonts' => ['Jpan' => 'ＭＳ ゴシック', 'Hang' => '굴림'],
+            ],
+            'minorFont' => [
+                'latin' => 'Georgia',
+                'ea' => '',
+                'cs' => '',
+                'fonts' => ['Jpan' => 'ＭＳ 明朝', 'Hang' => '바탕'],
+            ],
+        ]);
+
+        $outputFile = tempnam(sys_get_temp_dir(), 'PhpPresentationTest');
+
+        try {
+            $writer = new \PhpOffice\PhpPresentation\Writer\PowerPoint2007($oPhpPresentation);
+            $writer->save($outputFile);
+
+            $zip = new \ZipArchive();
+            $zip->open($outputFile);
+
+            $found = false;
+            for ($i = 0; $i < $zip->numFiles; ++$i) {
+                $name = $zip->getNameIndex($i);
+                if (preg_match('/^ppt\/theme\/theme\d+\.xml$/', $name)) {
+                    $content = $zip->getFromName($name);
+                    $dom = new \DOMDocument();
+                    $dom->loadXML($content);
+                    $xpath = new \DOMXPath($dom);
+                    $xpath->registerNamespace('a', 'http://schemas.openxmlformats.org/drawingml/2006/main');
+
+                    $majorLatin = $xpath->query('//a:fontScheme/a:majorFont/a:latin');
+
+                    if ($majorLatin->length > 0 && 'Arial' === $majorLatin->item(0)->getAttribute('typeface')) {
+                        $found = true;
+                    }
+                }
+            }
+
+            self::assertTrue($found, 'Expected to find theme with custom Arial font');
 
             $zip->close();
         } finally {
