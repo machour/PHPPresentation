@@ -653,7 +653,7 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
             && 0.0 === $font->getCharacterSpacing()
             && 'Calibri' === $font->getName()
             && Font::FORMAT_LATIN === $font->getFormat()
-            && 'FF000000' === $font->getColor()->getARGB();
+            && Color::COLOR_BLACK === $font->getColor()->getARGB();
     }
 
     /**
