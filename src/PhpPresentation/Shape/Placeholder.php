@@ -89,11 +89,17 @@ class Placeholder
         return $this;
     }
 
+    /**
+     * Get the placeholder size (e.g., "half", "quarter", "full").
+     */
     public function getSz(): ?string
     {
         return $this->sz;
     }
 
+    /**
+     * Set the placeholder size (e.g., "half", "quarter", "full").
+     */
     public function setSz(?string $sz): self
     {
         $this->sz = $sz;

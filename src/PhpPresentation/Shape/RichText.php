@@ -547,11 +547,20 @@ class RichText extends AbstractShape implements ComparableInterface
         return $this->verticalAlignCenter;
     }
 
+    /**
+     * Get raw bodyPr XML for round-trip fidelity.
+     */
     public function getRawBodyPrXml(): ?string
     {
         return $this->rawBodyPrXml;
     }
 
+    /**
+     * Set raw bodyPr XML for round-trip fidelity.
+     *
+     * When set, the writer will replay this XML verbatim instead of
+     * regenerating the element from object properties.
+     */
     public function setRawBodyPrXml(?string $xml): self
     {
         $this->rawBodyPrXml = $xml;
@@ -559,11 +568,20 @@ class RichText extends AbstractShape implements ComparableInterface
         return $this;
     }
 
+    /**
+     * Get raw lstStyle XML for round-trip fidelity.
+     */
     public function getRawLstStyleXml(): ?string
     {
         return $this->rawLstStyleXml;
     }
 
+    /**
+     * Set raw lstStyle XML for round-trip fidelity.
+     *
+     * When set, the writer will replay this XML verbatim instead of
+     * writing an empty lstStyle element.
+     */
     public function setRawLstStyleXml(?string $xml): self
     {
         $this->rawLstStyleXml = $xml;
@@ -571,11 +589,20 @@ class RichText extends AbstractShape implements ComparableInterface
         return $this;
     }
 
+    /**
+     * Get raw cNvSpPr XML for round-trip fidelity.
+     */
     public function getRawCNvSpPrXml(): ?string
     {
         return $this->rawCNvSpPrXml;
     }
 
+    /**
+     * Set raw cNvSpPr XML for round-trip fidelity.
+     *
+     * When set, the writer will replay this XML verbatim instead of
+     * generating a default cNvSpPr with txBox="1".
+     */
     public function setRawCNvSpPrXml(?string $xml): self
     {
         $this->rawCNvSpPrXml = $xml;
