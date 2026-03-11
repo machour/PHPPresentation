@@ -104,6 +104,9 @@ class PptSlideLayouts extends AbstractSlide
         $objWriter->writeAttribute('xmlns:a', 'http://schemas.openxmlformats.org/drawingml/2006/main');
         $objWriter->writeAttribute('xmlns:r', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships');
         $objWriter->writeAttribute('xmlns:p', 'http://schemas.openxmlformats.org/presentationml/2006/main');
+        if (null !== $pSlideLayout->getLayoutType()) {
+            $objWriter->writeAttribute('type', $pSlideLayout->getLayoutType());
+        }
         $objWriter->writeAttribute('preserve', 1);
         // p:sldLayout\p:cSld
         $objWriter->startElement('p:cSld');

@@ -715,6 +715,12 @@ class PowerPoint2007 implements ReaderInterface
             $oSlideLayout = new SlideLayout($oSlideMaster);
             $oSlideLayout->setRelsIndex('ppt/slideLayouts/_rels/' . $baseFile . '.rels');
 
+            // Type
+            $oElement = $xmlReader->getElement('/p:sldLayout');
+            if ($oElement instanceof DOMElement && $oElement->hasAttribute('type')) {
+                $oSlideLayout->setLayoutType($oElement->getAttribute('type'));
+            }
+
             // Name
             $oElement = $xmlReader->getElement('/p:sldLayout/p:cSld');
             if ($oElement instanceof DOMElement && $oElement->hasAttribute('name')) {
@@ -1092,16 +1098,16 @@ class PowerPoint2007 implements ReaderInterface
         $bodyPr = $document->getElement('p:txBody/a:bodyPr', $node);
         if ($bodyPr instanceof DOMElement) {
             if ($bodyPr->hasAttribute('lIns')) {
-                $oShape->setInsetLeft((int) $bodyPr->getAttribute('lIns'));
+                $oShape->setInsetLeft(CommonDrawing::emuToPixels((int) $bodyPr->getAttribute('lIns')));
             }
             if ($bodyPr->hasAttribute('tIns')) {
-                $oShape->setInsetTop((int) $bodyPr->getAttribute('tIns'));
+                $oShape->setInsetTop(CommonDrawing::emuToPixels((int) $bodyPr->getAttribute('tIns')));
             }
             if ($bodyPr->hasAttribute('rIns')) {
-                $oShape->setInsetRight((int) $bodyPr->getAttribute('rIns'));
+                $oShape->setInsetRight(CommonDrawing::emuToPixels((int) $bodyPr->getAttribute('rIns')));
             }
             if ($bodyPr->hasAttribute('bIns')) {
-                $oShape->setInsetBottom((int) $bodyPr->getAttribute('bIns'));
+                $oShape->setInsetBottom(CommonDrawing::emuToPixels((int) $bodyPr->getAttribute('bIns')));
             }
             if ($bodyPr->hasAttribute('anchorCtr')) {
                 $oShape->setVerticalAlignCenter((int) $bodyPr->getAttribute('anchorCtr'));
