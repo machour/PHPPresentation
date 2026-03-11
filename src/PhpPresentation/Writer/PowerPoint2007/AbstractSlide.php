@@ -167,7 +167,11 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
         // p:sp\p:nvSpPr\p:cNvPr
         $objWriter->startElement('p:cNvPr');
         $objWriter->writeAttribute('id', $shapeId);
-        $objWriter->writeAttribute('name', $shape->getName());
+        $shapeName = $shape->getName();
+        if ('' === $shapeName && $shape->isPlaceholder()) {
+            $shapeName = 'Placeholder for ' . $shape->getPlaceholder()->getType();
+        }
+        $objWriter->writeAttribute('name', $shapeName);
         // Hyperlink
         if ($shape->hasHyperlink()) {
             $this->writeHyperlink($objWriter, $shape);
