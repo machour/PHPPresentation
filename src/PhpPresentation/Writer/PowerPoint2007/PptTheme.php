@@ -74,7 +74,7 @@ class PptTheme extends AbstractDecoratorWriter
             'Uigh' => 'Microsoft Uighur',
         ];
 
-        $themeFonts = $oMasterSlide->getThemeFonts();
+        $themeFonts = $oMasterSlide->getThemeFonts() ?? [];
 
         // Create XML writer
         $objWriter = new XMLWriter(XMLWriter::STORAGE_MEMORY);

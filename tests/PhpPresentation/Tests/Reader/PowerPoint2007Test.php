@@ -1180,48 +1180,52 @@ class PowerPoint2007Test extends TestCase
 
         // Write to temp file
         $outputFile = tempnam(sys_get_temp_dir(), 'PhpPresentationTest');
-        $writer = new \PhpOffice\PhpPresentation\Writer\PowerPoint2007($oPhpPresentation);
-        $writer->save($outputFile);
 
-        // Verify the theme XML directly in the output zip
-        $zip = new \ZipArchive();
-        $zip->open($outputFile);
+        try {
+            $writer = new \PhpOffice\PhpPresentation\Writer\PowerPoint2007($oPhpPresentation);
+            $writer->save($outputFile);
 
-        $found = false;
-        for ($i = 0; $i < $zip->numFiles; ++$i) {
-            $name = $zip->getNameIndex($i);
-            if (preg_match('/^ppt\/theme\/theme\d+\.xml$/', $name)) {
-                $content = $zip->getFromName($name);
-                $dom = new \DOMDocument();
-                $dom->loadXML($content);
-                $xpath = new \DOMXPath($dom);
-                $xpath->registerNamespace('a', 'http://schemas.openxmlformats.org/drawingml/2006/main');
+            // Verify the theme XML directly in the output zip
+            $zip = new \ZipArchive();
+            $zip->open($outputFile);
 
-                $majorLatin = $xpath->query('//a:fontScheme/a:majorFont/a:latin');
-                $minorLatin = $xpath->query('//a:fontScheme/a:minorFont/a:latin');
+            $found = false;
+            for ($i = 0; $i < $zip->numFiles; ++$i) {
+                $name = $zip->getNameIndex($i);
+                if (preg_match('/^ppt\/theme\/theme\d+\.xml$/', $name)) {
+                    $content = $zip->getFromName($name);
+                    $dom = new \DOMDocument();
+                    $dom->loadXML($content);
+                    $xpath = new \DOMXPath($dom);
+                    $xpath->registerNamespace('a', 'http://schemas.openxmlformats.org/drawingml/2006/main');
 
-                if ($majorLatin->length > 0 && 'Arial' === $majorLatin->item(0)->getAttribute('typeface')) {
-                    $found = true;
-                    self::assertEquals('Arial', $majorLatin->item(0)->getAttribute('typeface'));
-                    self::assertEquals('Georgia', $minorLatin->item(0)->getAttribute('typeface'));
+                    $majorLatin = $xpath->query('//a:fontScheme/a:majorFont/a:latin');
+                    $minorLatin = $xpath->query('//a:fontScheme/a:minorFont/a:latin');
 
-                    // Verify script-specific fonts
-                    $majorFonts = $xpath->query('//a:fontScheme/a:majorFont/a:font');
-                    $foundJpan = false;
-                    foreach ($majorFonts as $font) {
-                        if ('Jpan' === $font->getAttribute('script')) {
-                            $foundJpan = true;
-                            self::assertEquals('ＭＳ ゴシック', $font->getAttribute('typeface'));
+                    if ($majorLatin->length > 0 && 'Arial' === $majorLatin->item(0)->getAttribute('typeface')) {
+                        $found = true;
+                        self::assertEquals('Arial', $majorLatin->item(0)->getAttribute('typeface'));
+                        self::assertEquals('Georgia', $minorLatin->item(0)->getAttribute('typeface'));
+
+                        // Verify script-specific fonts
+                        $majorFonts = $xpath->query('//a:fontScheme/a:majorFont/a:font');
+                        $foundJpan = false;
+                        foreach ($majorFonts as $font) {
+                            if ('Jpan' === $font->getAttribute('script')) {
+                                $foundJpan = true;
+                                self::assertEquals('ＭＳ ゴシック', $font->getAttribute('typeface'));
+                            }
                         }
+                        self::assertTrue($foundJpan, 'Expected Jpan script font in major font');
                     }
-                    self::assertTrue($foundJpan, 'Expected Jpan script font in major font');
                 }
             }
+
+            self::assertTrue($found, 'Expected to find theme with Arial major font');
+
+            $zip->close();
+        } finally {
+            @unlink($outputFile);
         }
-
-        self::assertTrue($found, 'Expected to find theme with Arial major font');
-
-        $zip->close();
-        unlink($outputFile);
     }
 }
