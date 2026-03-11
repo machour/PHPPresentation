@@ -728,6 +728,37 @@ class PowerPoint2007 implements ReaderInterface
                     $oSlideMaster->addSchemeColor($oSchemeColor);
                 }
             }
+
+            // Font Scheme
+            $themeFonts = [];
+            foreach (['majorFont', 'minorFont'] as $fontType) {
+                $fontData = ['latin' => '', 'ea' => '', 'cs' => '', 'fonts' => []];
+                $oFontElement = $xmlReader->getElement('/a:theme/a:themeElements/a:fontScheme/a:' . $fontType);
+                if ($oFontElement instanceof DOMElement) {
+                    $oLatin = $xmlReader->getElement('a:latin', $oFontElement);
+                    if ($oLatin instanceof DOMElement && $oLatin->hasAttribute('typeface')) {
+                        $fontData['latin'] = $oLatin->getAttribute('typeface');
+                    }
+                    $oEa = $xmlReader->getElement('a:ea', $oFontElement);
+                    if ($oEa instanceof DOMElement && $oEa->hasAttribute('typeface')) {
+                        $fontData['ea'] = $oEa->getAttribute('typeface');
+                    }
+                    $oCs = $xmlReader->getElement('a:cs', $oFontElement);
+                    if ($oCs instanceof DOMElement && $oCs->hasAttribute('typeface')) {
+                        $fontData['cs'] = $oCs->getAttribute('typeface');
+                    }
+                    $oFonts = $xmlReader->getElements('a:font', $oFontElement);
+                    foreach ($oFonts as $oFont) {
+                        if ($oFont instanceof DOMElement && $oFont->hasAttribute('script') && $oFont->hasAttribute('typeface')) {
+                            $fontData['fonts'][$oFont->getAttribute('script')] = $oFont->getAttribute('typeface');
+                        }
+                    }
+                }
+                $themeFonts[$fontType] = $fontData;
+            }
+            if (!empty($themeFonts['majorFont']['latin']) || !empty($themeFonts['minorFont']['latin'])) {
+                $oSlideMaster->setThemeFonts($themeFonts);
+            }
         }
     }
 

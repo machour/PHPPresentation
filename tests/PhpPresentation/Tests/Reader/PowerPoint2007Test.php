@@ -1120,4 +1120,108 @@ class PowerPoint2007Test extends TestCase
         $oPhpPresentation = $object->load($file);
         self::assertInstanceOf('PhpOffice\\PhpPresentation\\PhpPresentation', $oPhpPresentation);
     }
+
+    public function testThemeFontSchemePreserved(): void
+    {
+        $file = PHPPRESENTATION_TESTS_BASE_DIR . '/resources/files/Issue_00150.pptx';
+        $object = new PowerPoint2007();
+        $oPhpPresentation = $object->load($file);
+
+        $masterSlides = $oPhpPresentation->getAllMasterSlides();
+        self::assertCount(3, $masterSlides);
+
+        // Theme 1: Aspect - Verdana
+        $themeFonts0 = $masterSlides[0]->getThemeFonts();
+        self::assertNotNull($themeFonts0);
+        self::assertEquals('Verdana', $themeFonts0['majorFont']['latin']);
+        self::assertEquals('Verdana', $themeFonts0['minorFont']['latin']);
+
+        // Theme 2: Flow - Calibri/Constantia
+        $themeFonts1 = $masterSlides[1]->getThemeFonts();
+        self::assertNotNull($themeFonts1);
+        self::assertEquals('Calibri', $themeFonts1['majorFont']['latin']);
+        self::assertEquals('Constantia', $themeFonts1['minorFont']['latin']);
+
+        // Theme 3: Median - Tw Cen MT
+        $themeFonts2 = $masterSlides[2]->getThemeFonts();
+        self::assertNotNull($themeFonts2);
+        self::assertEquals('Tw Cen MT', $themeFonts2['majorFont']['latin']);
+        self::assertEquals('Tw Cen MT', $themeFonts2['minorFont']['latin']);
+
+        // Verify script-specific fonts are also loaded
+        self::assertArrayHasKey('Jpan', $themeFonts0['majorFont']['fonts']);
+        self::assertArrayHasKey('Hang', $themeFonts0['majorFont']['fonts']);
+    }
+
+    public function testThemeFontSchemeRoundTrip(): void
+    {
+        // Use Sample_12.pptx for the round-trip test as it can be successfully written
+        $file = PHPPRESENTATION_TESTS_BASE_DIR . '/resources/files/Sample_12.pptx';
+        $reader = new PowerPoint2007();
+        $oPhpPresentation = $reader->load($file);
+
+        // Set custom theme fonts on the first master slide
+        $masterSlides = $oPhpPresentation->getAllMasterSlides();
+        self::assertGreaterThan(0, count($masterSlides));
+        $masterSlides[0]->setThemeFonts([
+            'majorFont' => [
+                'latin' => 'Arial',
+                'ea' => '',
+                'cs' => '',
+                'fonts' => ['Jpan' => 'ＭＳ ゴシック', 'Hang' => '굴림'],
+            ],
+            'minorFont' => [
+                'latin' => 'Georgia',
+                'ea' => '',
+                'cs' => '',
+                'fonts' => ['Jpan' => 'ＭＳ 明朝', 'Hang' => '바탕'],
+            ],
+        ]);
+
+        // Write to temp file
+        $outputFile = tempnam(sys_get_temp_dir(), 'PhpPresentationTest');
+        $writer = new \PhpOffice\PhpPresentation\Writer\PowerPoint2007($oPhpPresentation);
+        $writer->save($outputFile);
+
+        // Verify the theme XML directly in the output zip
+        $zip = new \ZipArchive();
+        $zip->open($outputFile);
+
+        $found = false;
+        for ($i = 0; $i < $zip->numFiles; ++$i) {
+            $name = $zip->getNameIndex($i);
+            if (preg_match('/^ppt\/theme\/theme\d+\.xml$/', $name)) {
+                $content = $zip->getFromName($name);
+                $dom = new \DOMDocument();
+                $dom->loadXML($content);
+                $xpath = new \DOMXPath($dom);
+                $xpath->registerNamespace('a', 'http://schemas.openxmlformats.org/drawingml/2006/main');
+
+                $majorLatin = $xpath->query('//a:fontScheme/a:majorFont/a:latin');
+                $minorLatin = $xpath->query('//a:fontScheme/a:minorFont/a:latin');
+
+                if ($majorLatin->length > 0 && 'Arial' === $majorLatin->item(0)->getAttribute('typeface')) {
+                    $found = true;
+                    self::assertEquals('Arial', $majorLatin->item(0)->getAttribute('typeface'));
+                    self::assertEquals('Georgia', $minorLatin->item(0)->getAttribute('typeface'));
+
+                    // Verify script-specific fonts
+                    $majorFonts = $xpath->query('//a:fontScheme/a:majorFont/a:font');
+                    $foundJpan = false;
+                    foreach ($majorFonts as $font) {
+                        if ('Jpan' === $font->getAttribute('script')) {
+                            $foundJpan = true;
+                            self::assertEquals('ＭＳ ゴシック', $font->getAttribute('typeface'));
+                        }
+                    }
+                    self::assertTrue($foundJpan, 'Expected Jpan script font in major font');
+                }
+            }
+        }
+
+        self::assertTrue($found, 'Expected to find theme with Arial major font');
+
+        $zip->close();
+        unlink($outputFile);
+    }
 }

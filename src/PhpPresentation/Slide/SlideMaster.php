@@ -56,6 +56,16 @@ class SlideMaster extends AbstractSlide implements ComparableInterface, ShapeCon
     protected $arraySchemeColor = [];
 
     /**
+     * Theme font scheme data.
+     *
+     * @var array{
+     *     majorFont: array{latin: string, ea: string, cs: string, fonts: array<string, string>},
+     *     minorFont: array{latin: string, ea: string, cs: string, fonts: array<string, string>}
+     * }|null
+     */
+    protected $themeFonts = null;
+
+    /**
      * @var array<string, string>
      */
     protected $defaultSchemeColor = [
@@ -152,5 +162,29 @@ class SlideMaster extends AbstractSlide implements ComparableInterface, ShapeCon
     public function getAllSchemeColors(): array
     {
         return $this->arraySchemeColor;
+    }
+
+    /**
+     * @param array{
+     *     majorFont: array{latin: string, ea: string, cs: string, fonts: array<string, string>},
+     *     minorFont: array{latin: string, ea: string, cs: string, fonts: array<string, string>}
+     * } $themeFonts
+     */
+    public function setThemeFonts(array $themeFonts): self
+    {
+        $this->themeFonts = $themeFonts;
+
+        return $this;
+    }
+
+    /**
+     * @return array{
+     *     majorFont: array{latin: string, ea: string, cs: string, fonts: array<string, string>},
+     *     minorFont: array{latin: string, ea: string, cs: string, fonts: array<string, string>}
+     * }|null
+     */
+    public function getThemeFonts(): ?array
+    {
+        return $this->themeFonts;
     }
 }

@@ -74,6 +74,8 @@ class PptTheme extends AbstractDecoratorWriter
             'Uigh' => 'Microsoft Uighur',
         ];
 
+        $themeFonts = $oMasterSlide->getThemeFonts();
+
         // Create XML writer
         $objWriter = new XMLWriter(XMLWriter::STORAGE_MEMORY);
 
@@ -127,20 +129,21 @@ class PptTheme extends AbstractDecoratorWriter
 
         // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:latin
         $objWriter->startElement('a:latin');
-        $objWriter->writeAttribute('typeface', 'Calibri');
+        $objWriter->writeAttribute('typeface', $themeFonts['majorFont']['latin'] ?? 'Calibri');
         $objWriter->endElement();
 
         // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:ea
         $objWriter->startElement('a:ea');
-        $objWriter->writeAttribute('typeface', '');
+        $objWriter->writeAttribute('typeface', $themeFonts['majorFont']['ea'] ?? '');
         $objWriter->endElement();
 
         // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:cs
         $objWriter->startElement('a:cs');
-        $objWriter->writeAttribute('typeface', '');
+        $objWriter->writeAttribute('typeface', $themeFonts['majorFont']['cs'] ?? '');
         $objWriter->endElement();
 
-        foreach ($arrayFont as $script => $typeface) {
+        $majorFonts = $themeFonts['majorFont']['fonts'] ?? $arrayFont;
+        foreach ($majorFonts as $script => $typeface) {
             // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:font
             $objWriter->startElement('a:font');
             $objWriter->writeAttribute('script', $script);
@@ -154,23 +157,24 @@ class PptTheme extends AbstractDecoratorWriter
         // a:theme/a:themeElements/a:fontScheme/a:minorFont
         $objWriter->startElement('a:minorFont');
 
-        // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:latin
+        // a:theme/a:themeElements/a:fontScheme/a:minorFont/a:latin
         $objWriter->startElement('a:latin');
-        $objWriter->writeAttribute('typeface', 'Calibri');
+        $objWriter->writeAttribute('typeface', $themeFonts['minorFont']['latin'] ?? 'Calibri');
         $objWriter->endElement();
 
-        // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:ea
+        // a:theme/a:themeElements/a:fontScheme/a:minorFont/a:ea
         $objWriter->startElement('a:ea');
-        $objWriter->writeAttribute('typeface', '');
+        $objWriter->writeAttribute('typeface', $themeFonts['minorFont']['ea'] ?? '');
         $objWriter->endElement();
 
-        // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:cs
+        // a:theme/a:themeElements/a:fontScheme/a:minorFont/a:cs
         $objWriter->startElement('a:cs');
-        $objWriter->writeAttribute('typeface', '');
+        $objWriter->writeAttribute('typeface', $themeFonts['minorFont']['cs'] ?? '');
         $objWriter->endElement();
 
-        foreach ($arrayFont as $script => $typeface) {
-            // a:theme/a:themeElements/a:fontScheme/a:majorFont/a:font
+        $minorFonts = $themeFonts['minorFont']['fonts'] ?? $arrayFont;
+        foreach ($minorFonts as $script => $typeface) {
+            // a:theme/a:themeElements/a:fontScheme/a:minorFont/a:font
             $objWriter->startElement('a:font');
             $objWriter->writeAttribute('script', $script);
             $objWriter->writeAttribute('typeface', $typeface);
