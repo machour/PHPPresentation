@@ -119,6 +119,22 @@ abstract class AbstractShape implements ComparableInterface
     protected $name = '';
 
     /**
+     * Raw EMU values for round-trip fidelity (avoids pixel conversion precision loss).
+     *
+     * @var int|null
+     */
+    protected $offsetXEmu;
+
+    /** @var int|null */
+    protected $offsetYEmu;
+
+    /** @var int|null */
+    protected $widthEmu;
+
+    /** @var int|null */
+    protected $heightEmu;
+
+    /**
      * Create a new self.
      */
     public function __construct()
@@ -313,6 +329,54 @@ abstract class AbstractShape implements ComparableInterface
     {
         $this->width = $width;
         $this->height = $height;
+
+        return $this;
+    }
+
+    public function getOffsetXEmu(): ?int
+    {
+        return $this->offsetXEmu;
+    }
+
+    public function setOffsetXEmu(?int $value): self
+    {
+        $this->offsetXEmu = $value;
+
+        return $this;
+    }
+
+    public function getOffsetYEmu(): ?int
+    {
+        return $this->offsetYEmu;
+    }
+
+    public function setOffsetYEmu(?int $value): self
+    {
+        $this->offsetYEmu = $value;
+
+        return $this;
+    }
+
+    public function getWidthEmu(): ?int
+    {
+        return $this->widthEmu;
+    }
+
+    public function setWidthEmu(?int $value): self
+    {
+        $this->widthEmu = $value;
+
+        return $this;
+    }
+
+    public function getHeightEmu(): ?int
+    {
+        return $this->heightEmu;
+    }
+
+    public function setHeightEmu(?int $value): self
+    {
+        $this->heightEmu = $value;
 
         return $this;
     }

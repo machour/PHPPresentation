@@ -134,23 +134,23 @@ class PptSlideLayouts extends AbstractSlide
         $objWriter->startElement('a:xfrm');
         // p:sldLayout\p:cSld\p:spTree\p:grpSpPr\a:xfrm\a:off
         $objWriter->startElement('a:off');
-        $objWriter->writeAttribute('x', CommonDrawing::pixelsToEmu($pSlideLayout->getOffsetX()));
-        $objWriter->writeAttribute('y', CommonDrawing::pixelsToEmu($pSlideLayout->getOffsetY()));
+        $objWriter->writeAttribute('x', 0);
+        $objWriter->writeAttribute('y', 0);
         $objWriter->endElement();
         // p:sldLayout\p:cSld\p:spTree\p:grpSpPr\a:xfrm\a:ext
         $objWriter->startElement('a:ext');
-        $objWriter->writeAttribute('cx', CommonDrawing::pixelsToEmu($pSlideLayout->getExtentX()));
-        $objWriter->writeAttribute('cy', CommonDrawing::pixelsToEmu($pSlideLayout->getExtentY()));
+        $objWriter->writeAttribute('cx', 0);
+        $objWriter->writeAttribute('cy', 0);
         $objWriter->endElement();
         // p:sldLayout\p:cSld\p:spTree\p:grpSpPr\a:xfrm\a:chOff
         $objWriter->startElement('a:chOff');
-        $objWriter->writeAttribute('x', CommonDrawing::pixelsToEmu($pSlideLayout->getOffsetX()));
-        $objWriter->writeAttribute('y', CommonDrawing::pixelsToEmu($pSlideLayout->getOffsetY()));
+        $objWriter->writeAttribute('x', 0);
+        $objWriter->writeAttribute('y', 0);
         $objWriter->endElement();
         // p:sldLayout\p:cSld\p:spTree\p:grpSpPr\a:xfrm\a:chExt
         $objWriter->startElement('a:chExt');
-        $objWriter->writeAttribute('cx', CommonDrawing::pixelsToEmu($pSlideLayout->getExtentX()));
-        $objWriter->writeAttribute('cy', CommonDrawing::pixelsToEmu($pSlideLayout->getExtentY()));
+        $objWriter->writeAttribute('cx', 0);
+        $objWriter->writeAttribute('cy', 0);
         $objWriter->endElement();
         // p:sldLayout\p:cSld\p:spTree\p:grpSpPr\a:xfrm\
         $objWriter->endElement();

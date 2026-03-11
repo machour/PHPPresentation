@@ -53,6 +53,13 @@ class Placeholder
      */
     protected $type;
 
+    /**
+     * Specifies the size of the placeholder (e.g., "half", "quarter", "full").
+     *
+     * @var string|null
+     */
+    protected $sz;
+
     public function __construct(string $type)
     {
         $this->type = $type;
@@ -78,6 +85,18 @@ class Placeholder
     public function setIdx(int $idx): self
     {
         $this->idx = $idx;
+
+        return $this;
+    }
+
+    public function getSz(): ?string
+    {
+        return $this->sz;
+    }
+
+    public function setSz(?string $sz): self
+    {
+        $this->sz = $sz;
 
         return $this;
     }

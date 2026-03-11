@@ -957,20 +957,28 @@ class PowerPoint2007 implements ReaderInterface
         $oElement = $document->getElement('p:spPr/a:xfrm/a:off', $node);
         if ($oElement instanceof DOMElement) {
             if ($oElement->hasAttribute('x')) {
-                $oShape->setOffsetX((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('x')));
+                $emuX = (int) $oElement->getAttribute('x');
+                $oShape->setOffsetX((int) CommonDrawing::emuToPixels($emuX));
+                $oShape->setOffsetXEmu($emuX);
             }
             if ($oElement->hasAttribute('y')) {
-                $oShape->setOffsetY((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('y')));
+                $emuY = (int) $oElement->getAttribute('y');
+                $oShape->setOffsetY((int) CommonDrawing::emuToPixels($emuY));
+                $oShape->setOffsetYEmu($emuY);
             }
         }
 
         $oElement = $document->getElement('p:spPr/a:xfrm/a:ext', $node);
         if ($oElement instanceof DOMElement) {
             if ($oElement->hasAttribute('cx')) {
-                $oShape->setWidth((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('cx')));
+                $emuCx = (int) $oElement->getAttribute('cx');
+                $oShape->setWidth((int) CommonDrawing::emuToPixels($emuCx));
+                $oShape->setWidthEmu($emuCx);
             }
             if ($oElement->hasAttribute('cy')) {
-                $oShape->setHeight((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('cy')));
+                $emuCy = (int) $oElement->getAttribute('cy');
+                $oShape->setHeight((int) CommonDrawing::emuToPixels($emuCy));
+                $oShape->setHeightEmu($emuCy);
             }
         }
         // Load shape effects
@@ -1058,20 +1066,28 @@ class PowerPoint2007 implements ReaderInterface
         $oElement = $document->getElement('p:spPr/a:xfrm/a:off', $node);
         if ($oElement instanceof DOMElement) {
             if ($oElement->hasAttribute('x')) {
-                $oShape->setOffsetX((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('x')));
+                $emuX = (int) $oElement->getAttribute('x');
+                $oShape->setOffsetX((int) CommonDrawing::emuToPixels($emuX));
+                $oShape->setOffsetXEmu($emuX);
             }
             if ($oElement->hasAttribute('y')) {
-                $oShape->setOffsetY((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('y')));
+                $emuY = (int) $oElement->getAttribute('y');
+                $oShape->setOffsetY((int) CommonDrawing::emuToPixels($emuY));
+                $oShape->setOffsetYEmu($emuY);
             }
         }
 
         $oElement = $document->getElement('p:spPr/a:xfrm/a:ext', $node);
         if ($oElement instanceof DOMElement) {
             if ($oElement->hasAttribute('cx')) {
-                $oShape->setWidth((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('cx')));
+                $emuCx = (int) $oElement->getAttribute('cx');
+                $oShape->setWidth((int) CommonDrawing::emuToPixels($emuCx));
+                $oShape->setWidthEmu($emuCx);
             }
             if ($oElement->hasAttribute('cy')) {
-                $oShape->setHeight((int) CommonDrawing::emuToPixels((int) $oElement->getAttribute('cy')));
+                $emuCy = (int) $oElement->getAttribute('cy');
+                $oShape->setHeight((int) CommonDrawing::emuToPixels($emuCy));
+                $oShape->setHeightEmu($emuCy);
             }
         }
 
@@ -1081,6 +1097,9 @@ class PowerPoint2007 implements ReaderInterface
                 $placeholder = new Placeholder($oElement->getAttribute('type'));
                 if ($oElement->hasAttribute('idx')) {
                     $placeholder->setIdx((int) $oElement->getAttribute('idx'));
+                }
+                if ($oElement->hasAttribute('sz')) {
+                    $placeholder->setSz($oElement->getAttribute('sz'));
                 }
                 $oShape->setPlaceHolder($placeholder);
             }
@@ -1112,6 +1131,20 @@ class PowerPoint2007 implements ReaderInterface
             if ($bodyPr->hasAttribute('anchorCtr')) {
                 $oShape->setVerticalAlignCenter((int) $bodyPr->getAttribute('anchorCtr'));
             }
+            // Store raw bodyPr XML for round-trip fidelity
+            $oShape->setRawBodyPrXml($bodyPr->ownerDocument->saveXML($bodyPr));
+        }
+
+        // Store raw lstStyle XML for round-trip fidelity
+        $lstStyle = $document->getElement('p:txBody/a:lstStyle', $node);
+        if ($lstStyle instanceof DOMElement) {
+            $oShape->setRawLstStyleXml($lstStyle->ownerDocument->saveXML($lstStyle));
+        }
+
+        // Store raw cNvSpPr XML for round-trip fidelity
+        $cNvSpPr = $document->getElement('p:nvSpPr/p:cNvSpPr', $node);
+        if ($cNvSpPr instanceof DOMElement) {
+            $oShape->setRawCNvSpPrXml($cNvSpPr->ownerDocument->saveXML($cNvSpPr));
         }
 
         $arrayElements = $document->getElements('p:txBody/a:p', $node);

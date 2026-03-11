@@ -184,6 +184,27 @@ class RichText extends AbstractShape implements ComparableInterface
     private $verticalAlignCenter = self::VALIGN_NOTCENTER;
 
     /**
+     * Raw XML for a:bodyPr element (for round-trip fidelity).
+     *
+     * @var string|null
+     */
+    private $rawBodyPrXml;
+
+    /**
+     * Raw XML for a:lstStyle element (for round-trip fidelity).
+     *
+     * @var string|null
+     */
+    private $rawLstStyleXml;
+
+    /**
+     * Raw XML for p:cNvSpPr element (for round-trip fidelity).
+     *
+     * @var string|null
+     */
+    private $rawCNvSpPrXml;
+
+    /**
      * Create a new \PhpOffice\PhpPresentation\Shape\RichText instance.
      */
     public function __construct()
@@ -524,6 +545,42 @@ class RichText extends AbstractShape implements ComparableInterface
     public function getVerticalAlignCenter(): int
     {
         return $this->verticalAlignCenter;
+    }
+
+    public function getRawBodyPrXml(): ?string
+    {
+        return $this->rawBodyPrXml;
+    }
+
+    public function setRawBodyPrXml(?string $xml): self
+    {
+        $this->rawBodyPrXml = $xml;
+
+        return $this;
+    }
+
+    public function getRawLstStyleXml(): ?string
+    {
+        return $this->rawLstStyleXml;
+    }
+
+    public function setRawLstStyleXml(?string $xml): self
+    {
+        $this->rawLstStyleXml = $xml;
+
+        return $this;
+    }
+
+    public function getRawCNvSpPrXml(): ?string
+    {
+        return $this->rawCNvSpPrXml;
+    }
+
+    public function setRawCNvSpPrXml(?string $xml): self
+    {
+        $this->rawCNvSpPrXml = $xml;
+
+        return $this;
     }
 
     /**
