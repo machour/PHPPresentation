@@ -198,13 +198,7 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
         // > p:sp\p:nvSpPr
         $objWriter->endElement();
 
-        // Detect if this placeholder should inherit geometry from layout
-        // (position/size all zero means no explicit geometry was defined)
-        $isInheritedPlaceholder = $shape->isPlaceholder()
-            && 0 === $shape->getOffsetX()
-            && 0 === $shape->getOffsetY()
-            && 0 === $shape->getWidth()
-            && 0 === $shape->getHeight();
+        $isInheritedPlaceholder = $this->isInheritedPlaceholder($shape);
 
         if ($isInheritedPlaceholder) {
             // Write empty p:spPr to inherit position/size from layout
@@ -613,6 +607,21 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
 
             $objWriter->endElement();
         }
+    }
+
+    /**
+     * Check if a shape is a placeholder that should inherit geometry from layout.
+     *
+     * When a placeholder shape has zero position and dimensions, it means no
+     * explicit geometry was defined and it should inherit from the slide layout.
+     */
+    protected function isInheritedPlaceholder(RichText $shape): bool
+    {
+        return $shape->isPlaceholder()
+            && 0 === $shape->getOffsetX()
+            && 0 === $shape->getOffsetY()
+            && 0 === $shape->getWidth()
+            && 0 === $shape->getHeight();
     }
 
     /**
