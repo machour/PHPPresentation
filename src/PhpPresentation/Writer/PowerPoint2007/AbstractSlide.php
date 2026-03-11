@@ -324,6 +324,10 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
         } elseif ($isInheritedPlaceholder) {
             // Write minimal paragraph to preserve layout text inheritance
             $this->writePlaceholderParagraphs($objWriter, $shape->getParagraphs());
+        } elseif ($shape->isPlaceholder() && $this->hasAllDefaultRuns($shape)) {
+            // Placeholder with all-default text (e.g., layout placeholder template text)
+            // Write minimal paragraphs to preserve inheritance from master
+            $this->writePlaceholderParagraphs($objWriter, $shape->getParagraphs());
         } else {
             // Write paragraphs
             $this->writeParagraphs($objWriter, $shape->getParagraphs());
@@ -595,7 +599,11 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
                     if ('' !== $text) {
                         $objWriter->startElement('a:r');
                         if ($element instanceof Run) {
-                            $this->writeRunStyles($objWriter, $element);
+                            if ($this->hasDefaultFontProperties($element)) {
+                                $this->writeMinimalRunStyles($objWriter, $element);
+                            } else {
+                                $this->writeRunStyles($objWriter, $element);
+                            }
                         }
                         $objWriter->startElement('a:t');
                         $objWriter->writeCData(Text::controlCharacterPHP2OOXML($text));
@@ -622,6 +630,62 @@ abstract class AbstractSlide extends AbstractDecoratorWriter
             && 0 === $shape->getOffsetY()
             && 0 === $shape->getWidth()
             && 0 === $shape->getHeight();
+    }
+
+    /**
+     * Check if a Run element has all default font properties.
+     *
+     * When true, the run was likely loaded from XML with minimal formatting
+     * (e.g., only lang attribute) and should be written back minimally to
+     * preserve formatting inheritance from master/layout.
+     */
+    protected function hasDefaultFontProperties(Run $element): bool
+    {
+        $font = $element->getFont();
+
+        return !$font->isBold()
+            && !$font->isItalic()
+            && Font::STRIKE_NONE === $font->getStrikethrough()
+            && 10 === $font->getSize()
+            && Font::UNDERLINE_NONE === $font->getUnderline()
+            && Font::CAPITALIZATION_NONE === $font->getCapitalization()
+            && 0 === $font->getBaseline()
+            && 0.0 === $font->getCharacterSpacing()
+            && 'Calibri' === $font->getName()
+            && Font::FORMAT_LATIN === $font->getFormat()
+            && 'FF000000' === $font->getColor()->getARGB();
+    }
+
+    /**
+     * Write minimal run styles (a:rPr) for placeholder shapes.
+     *
+     * Only writes the lang attribute, allowing text styling to be
+     * inherited from the layout or master slide.
+     */
+    protected function writeMinimalRunStyles(XMLWriter $objWriter, Run $element): void
+    {
+        $objWriter->startElement('a:rPr');
+        $objWriter->writeAttribute('lang', ($element->getLanguage() ? $element->getLanguage() : 'en-US'));
+        $objWriter->endElement();
+    }
+
+    /**
+     * Check if all runs in a shape have default font properties.
+     *
+     * Used to determine if placeholder text should be written with
+     * minimal formatting to preserve master/layout inheritance.
+     */
+    protected function hasAllDefaultRuns(RichText $shape): bool
+    {
+        foreach ($shape->getParagraphs() as $paragraph) {
+            foreach ($paragraph->getRichTextElements() as $element) {
+                if ($element instanceof Run && !$this->hasDefaultFontProperties($element)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     /**
