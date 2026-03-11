@@ -1207,7 +1207,7 @@ class PowerPoint2007Test extends TestCase
 
             $zip->close();
         } finally {
-            @unlink($outputFile);
+            if (file_exists($outputFile)) { unlink($outputFile); };
         }
     }
 
@@ -1269,7 +1269,7 @@ class PowerPoint2007Test extends TestCase
 
             $zip->close();
         } finally {
-            @unlink($outputFile);
+            if (file_exists($outputFile)) { unlink($outputFile); };
         }
     }
 }
